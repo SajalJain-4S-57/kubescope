@@ -16,9 +16,16 @@ const initialDrillState: DrillState = {
   selectedNamespace: null,
 };
 
+const levelTransitions: Record<DrillLevel, { scale: number; blur: string }> = {
+  cluster: { scale: 1, blur: "0px" },
+  namespace: { scale: 0.98, blur: "0px" },
+  pod: { scale: 0.96, blur: "0px" },
+};
+
 export default function CostExplorer() {
   const [drillState, setDrillState] = useState<DrillState>(initialDrillState);
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
+  const [drillDirection, setDrillDirection] = useState<"in" | "out">("in");
 
   const { data, isLoading, isError } = useCostData({
     level: drillState.level,
@@ -31,7 +38,7 @@ export default function CostExplorer() {
   });
 
   const breadcrumbs: BreadcrumbItem[] = [
-    { label: "Cluster", level: "cluster" },
+    { label: "All Clusters", level: "cluster" },
     ...(drillState.selectedCluster
       ? [{ label: drillState.selectedCluster, level: "namespace" as DrillLevel }]
       : []),
@@ -40,25 +47,30 @@ export default function CostExplorer() {
       : []),
   ];
 
-  const handleDrill = useCallback((row: CostRow) => {
-    setActiveRowId(row.id);
+  const handleDrill = useCallback(
+    (row: CostRow) => {
+      setDrillDirection("in");
+      setActiveRowId(row.id);
 
-    if (drillState.level === "cluster") {
-      setDrillState({
-        level: "namespace",
-        selectedCluster: row.name,
-        selectedNamespace: null,
-      });
-    } else if (drillState.level === "namespace") {
-      setDrillState((prev) => ({
-        ...prev,
-        level: "pod",
-        selectedNamespace: row.name,
-      }));
-    }
-  }, [drillState.level]);
+      if (drillState.level === "cluster") {
+        setDrillState({
+          level: "namespace",
+          selectedCluster: row.name,
+          selectedNamespace: null,
+        });
+      } else if (drillState.level === "namespace") {
+        setDrillState((prev) => ({
+          ...prev,
+          level: "pod",
+          selectedNamespace: row.name,
+        }));
+      }
+    },
+    [drillState.level]
+  );
 
   const handleBreadcrumbClick = useCallback((level: DrillLevel) => {
+    setDrillDirection("out");
     if (level === "cluster") {
       setDrillState(initialDrillState);
       setActiveRowId(null);
@@ -73,6 +85,10 @@ export default function CostExplorer() {
   }, []);
 
   const isLeafLevel = drillState.level === "pod";
+  const compositeKey =
+    drillState.level +
+    (drillState.selectedCluster ?? "") +
+    (drillState.selectedNamespace ?? "");
 
   return (
     <div
@@ -83,14 +99,53 @@ export default function CostExplorer() {
         gap: tokens.spacing.xl,
       }}
     >
-      {/* Header with breadcrumbs */}
+      {/* Drill Header */}
       <DrillHeader
         level={drillState.level}
         breadcrumbs={breadcrumbs}
         onBreadcrumbClick={handleBreadcrumbClick}
       />
 
-      {/* Main content area */}
+      {/* Level indicator dots */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: tokens.spacing.sm,
+        }}
+      >
+        {(["cluster", "namespace", "pod"] as DrillLevel[]).map((l) => (
+          <motion.div
+            key={l}
+            animate={{
+              width: drillState.level === l ? "24px" : "6px",
+              backgroundColor:
+                drillState.level === l
+                  ? tokens.colors.accentSuccess
+                  : tokens.colors.borderStrong,
+            }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            style={{
+              height: "6px",
+              borderRadius: tokens.radius.full,
+            }}
+          />
+        ))}
+        <span
+          style={{
+            fontSize: tokens.font.xs,
+            color: tokens.colors.textMuted,
+            fontFamily: tokens.font.mono,
+            marginInlineStart: tokens.spacing.xs,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+          }}
+        >
+          {drillState.level}
+        </span>
+      </div>
+
+      {/* Main content */}
       <div
         style={{
           display: "flex",
@@ -99,63 +154,103 @@ export default function CostExplorer() {
           flexWrap: "wrap",
         }}
       >
-        {/* Chart + Table */}
         <div style={{ flex: 1, minWidth: "280px" }}>
-          {/* Loading state */}
+          {/* Loading skeleton */}
           {isLoading && (
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
                 gap: tokens.spacing.md,
-                padding: tokens.spacing.xl,
-                alignItems: "center",
               }}
             >
+              {/* Bar skeleton */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-end",
+                  gap: tokens.spacing.lg,
+                  height: "200px",
+                  padding: tokens.spacing.md,
+                }}
+              >
+                {[80, 45, 30, 20].map((h, i) => (
+                  <motion.div
+                    key={i}
+                    className="shimmer"
+                    style={{
+                      flex: 1,
+                      height: `${h}%`,
+                      borderRadius: `${tokens.radius.md} ${tokens.radius.md} 0 0`,
+                    }}
+                  />
+                ))}
+              </div>
+              {/* Row skeletons */}
               {[1, 2, 3, 4].map((i) => (
                 <motion.div
                   key={i}
-                  animate={{ opacity: [0.4, 0.8, 0.4] }}
+                  className="shimmer"
+                  animate={{ opacity: [0.5, 1, 0.5] }}
                   transition={{
-                    duration: 1.2,
+                    duration: 1.5,
                     repeat: Infinity,
-                    delay: i * 0.15,
+                    delay: i * 0.1,
                   }}
                   style={{
                     height: "48px",
                     borderRadius: tokens.radius.md,
-                    backgroundColor: tokens.colors.bgSecondary,
-                    width: "100%",
                   }}
                 />
               ))}
             </div>
           )}
 
-          {/* Error state */}
+          {/* Error */}
           {isError && (
-            <div
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              role="alert"
               style={{
                 padding: tokens.spacing.xl,
                 textAlign: "center",
                 color: tokens.colors.accentError,
                 fontSize: tokens.font.md,
+                fontFamily: tokens.font.mono,
+                border: `1px solid ${tokens.colors.accentError}`,
+                borderRadius: tokens.radius.lg,
+                backgroundColor: `color-mix(in srgb, ${tokens.colors.accentError} 5%, transparent)`,
               }}
-              role="alert"
             >
-              Failed to load cost data. Please try again.
-            </div>
+              ⚠ Failed to load cost data. Please try again.
+            </motion.div>
           )}
 
-          {/* Success state */}
+          {/* Success */}
           {!isLoading && !isError && data && (
             <AnimatePresence mode="wait">
               <motion.div
-                key={drillState.level + (drillState.selectedCluster ?? "") + (drillState.selectedNamespace ?? "")}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
+                key={compositeKey}
+                initial={{
+                  opacity: 0,
+                  scale: drillDirection === "in" ? 1.04 : 0.96,
+                  filter: "blur(4px)",
+                }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                  filter: "blur(0px)",
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: drillDirection === "in" ? 0.96 : 1.04,
+                  filter: "blur(4px)",
+                }}
+                transition={{
+                  duration: 0.35,
+                  ease: "easeOut",
+                }}
               >
                 <BarChart
                   rows={data}
@@ -174,12 +269,9 @@ export default function CostExplorer() {
           )}
         </div>
 
-        {/* Insight Panel — only at pod level */}
+        {/* Insight Panel */}
         {!isLoading && !isError && data && (
-          <InsightPanel
-            rows={data}
-            visible={isLeafLevel}
-          />
+          <InsightPanel rows={data} visible={isLeafLevel} />
         )}
       </div>
 
@@ -187,17 +279,19 @@ export default function CostExplorer() {
       <AnimatePresence>
         {!isLeafLevel && !isLoading && (
           <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
             style={{
-              fontSize: tokens.font.sm,
+              fontSize: tokens.font.xs,
               color: tokens.colors.textMuted,
               textAlign: "center",
-              paddingBottom: tokens.spacing.md,
+              fontFamily: tokens.font.mono,
+              letterSpacing: "0.06em",
+              paddingBottom: tokens.spacing.sm,
             }}
           >
-            Click any bar or row to drill down →
+            ↑ CLICK ANY BAR OR ROW TO DRILL DOWN
           </motion.p>
         )}
       </AnimatePresence>
