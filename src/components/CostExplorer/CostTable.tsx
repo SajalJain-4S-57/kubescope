@@ -39,7 +39,7 @@ export default function CostTable({
         style={{
           width: "100%",
           borderCollapse: "collapse",
-          fontSize: tokens.font.md,
+          fontSize: tokens.font.sm,
         }}
         role="table"
         aria-label="Resource cost breakdown table"
@@ -53,24 +53,29 @@ export default function CostTable({
                 padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
                 color: tokens.colors.textMuted,
                 fontWeight: 500,
-                fontSize: tokens.font.sm,
+                fontSize: tokens.font.xs,
                 borderBottom: `1px solid ${tokens.colors.border}`,
+                fontFamily: tokens.font.mono,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
               }}
             >
+              Name
             </th>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={
-                  col.secondary ? "cost-table-cell--secondary" : undefined
-                }
+                className={col.secondary ? "cost-table-cell--secondary" : undefined}
                 style={{
                   textAlign: "right",
                   padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
                   color: tokens.colors.textMuted,
                   fontWeight: 500,
-                  fontSize: tokens.font.sm,
+                  fontSize: tokens.font.xs,
                   borderBottom: `1px solid ${tokens.colors.border}`,
+                  fontFamily: tokens.font.mono,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
                 }}
               >
                 {col.label}
@@ -103,33 +108,48 @@ export default function CostTable({
                     onRowClick(row);
                   }
                 }}
-                aria-label={
-                  isClickable ? `Drill into ${row.name}` : row.name
-                }
+                aria-label={isClickable ? `Drill into ${row.name}` : row.name}
                 style={{
                   cursor: isClickable ? "pointer" : "default",
                   backgroundColor: isActive
                     ? tokens.colors.accentSuccessLight
                     : "transparent",
-                  borderRadius: tokens.radius.sm,
                   transition: `background-color ${tokens.transition.fast}`,
+                  borderLeft: isActive
+                    ? `2px solid ${tokens.colors.accentSuccess}`
+                    : "2px solid transparent",
                 }}
                 whileHover={
                   isClickable
-                    ? { backgroundColor: tokens.colors.bgCardHover }
+                    ? {
+                        backgroundColor: tokens.colors.bgCardHover,
+                      }
                     : {}
                 }
               >
-                {/* Row name */}
+                {/* Name */}
                 <td
                   style={{
                     padding: `${tokens.spacing.md} ${tokens.spacing.md}`,
-                    fontWeight: 600,
-                    color: tokens.colors.textPrimary,
+                    fontWeight: 700,
+                    color: isActive
+                      ? tokens.colors.accentSuccess
+                      : tokens.colors.textPrimary,
                     borderBottom: `1px solid ${tokens.colors.border}`,
                     whiteSpace: "nowrap",
+                    fontFamily: tokens.font.mono,
+                    fontSize: tokens.font.sm,
                   }}
                 >
+                  {isActive && (
+                    <motion.span
+                      animate={{ opacity: [1, 0, 1] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                      style={{ marginInlineEnd: tokens.spacing.xs }}
+                    >
+                      ▶
+                    </motion.span>
+                  )}
                   {row.name}
                 </td>
 
@@ -140,6 +160,7 @@ export default function CostTable({
                     padding: `${tokens.spacing.md} ${tokens.spacing.md}`,
                     color: tokens.colors.textSecondary,
                     borderBottom: `1px solid ${tokens.colors.border}`,
+                    fontFamily: tokens.font.mono,
                   }}
                 >
                   <AnimatedNumber value={row.cpu} prefix="$" />
@@ -152,12 +173,13 @@ export default function CostTable({
                     padding: `${tokens.spacing.md} ${tokens.spacing.md}`,
                     color: tokens.colors.textSecondary,
                     borderBottom: `1px solid ${tokens.colors.border}`,
+                    fontFamily: tokens.font.mono,
                   }}
                 >
                   <AnimatedNumber value={row.ram} prefix="$" />
                 </td>
 
-                {/* Storage - secondary (hidden on small containers) */}
+                {/* Storage */}
                 <td
                   className="cost-table-cell--secondary"
                   style={{
@@ -165,12 +187,13 @@ export default function CostTable({
                     padding: `${tokens.spacing.md} ${tokens.spacing.md}`,
                     color: tokens.colors.textSecondary,
                     borderBottom: `1px solid ${tokens.colors.border}`,
+                    fontFamily: tokens.font.mono,
                   }}
                 >
                   <AnimatedNumber value={row.storage} prefix="$" />
                 </td>
 
-                {/* Network - secondary */}
+                {/* Network */}
                 <td
                   className="cost-table-cell--secondary"
                   style={{
@@ -178,12 +201,13 @@ export default function CostTable({
                     padding: `${tokens.spacing.md} ${tokens.spacing.md}`,
                     color: tokens.colors.textSecondary,
                     borderBottom: `1px solid ${tokens.colors.border}`,
+                    fontFamily: tokens.font.mono,
                   }}
                 >
                   <AnimatedNumber value={row.network} prefix="$" />
                 </td>
 
-                {/* GPU - secondary */}
+                {/* GPU */}
                 <td
                   className="cost-table-cell--secondary"
                   style={{
@@ -191,6 +215,7 @@ export default function CostTable({
                     padding: `${tokens.spacing.md} ${tokens.spacing.md}`,
                     color: tokens.colors.textSecondary,
                     borderBottom: `1px solid ${tokens.colors.border}`,
+                    fontFamily: tokens.font.mono,
                   }}
                 >
                   <AnimatedNumber value={row.gpu} prefix="$" />
@@ -202,6 +227,7 @@ export default function CostTable({
                     textAlign: "right",
                     padding: `${tokens.spacing.md} ${tokens.spacing.md}`,
                     borderBottom: `1px solid ${tokens.colors.border}`,
+                    fontFamily: tokens.font.mono,
                   }}
                 >
                   <span
@@ -212,7 +238,15 @@ export default function CostTable({
                           : row.efficiency >= 25
                           ? tokens.colors.accentWarning
                           : tokens.colors.accentError,
-                      fontWeight: 500,
+                      fontWeight: 700,
+                      padding: `2px ${tokens.spacing.sm}`,
+                      borderRadius: tokens.radius.full,
+                      backgroundColor:
+                        row.efficiency >= 50
+                          ? `color-mix(in srgb, ${tokens.colors.accentSuccess} 10%, transparent)`
+                          : row.efficiency >= 25
+                          ? `color-mix(in srgb, ${tokens.colors.accentWarning} 10%, transparent)`
+                          : `color-mix(in srgb, ${tokens.colors.accentError} 10%, transparent)`,
                     }}
                   >
                     <AnimatedNumber value={row.efficiency} suffix="%" />
@@ -224,9 +258,10 @@ export default function CostTable({
                   style={{
                     textAlign: "right",
                     padding: `${tokens.spacing.md} ${tokens.spacing.md}`,
-                    fontWeight: 700,
+                    fontWeight: 800,
                     color: tokens.colors.textPrimary,
                     borderBottom: `1px solid ${tokens.colors.border}`,
+                    fontFamily: tokens.font.mono,
                   }}
                 >
                   <AnimatedNumber value={row.total} prefix="$" />
