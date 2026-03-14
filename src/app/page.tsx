@@ -451,7 +451,7 @@ export default function Home() {
           fontFamily: tokens.font.mono,
         }}
       >
-        KubeScope — Built for Atomity Frontend Engineering Challenge
+        KubeScope — Built for Atomity Frontend Engineering 
       </footer>
     </div>
   );

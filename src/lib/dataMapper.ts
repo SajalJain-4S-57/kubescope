@@ -1,46 +1,53 @@
 import { CostRow, DrillLevel } from "./types";
 
-// Seeds a deterministic number from a string so same input = same output
-const seedNumber = (str: string, min: number, max: number): number => {
-  let hash = 0;
+// Better hash — djb2 algorithm, more variance for similar strings
+const hash = (str: string): number => {
+  let h = 5381;
   for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    h = (h * 33) ^ str.charCodeAt(i);
   }
-  const normalized = Math.abs(hash) / 2147483647;
-  return Math.floor(normalized * (max - min) + min);
+  return Math.abs(h >>> 0);
 };
 
-// Generates a full CostRow from a name + level
+const seedNumber = (seed: string, min: number, max: number): number => {
+  const h = hash(seed);
+  // Multiply by large prime before modulo to increase spread
+  const spread = (h * 2654435761) >>> 0;
+  return min + (spread % (max - min));
+};
+
 export const generateCostRow = (
   id: string,
+  seedKey: string,
   name: string,
   level: DrillLevel
 ): CostRow => {
   const multiplier =
     level === "cluster" ? 1 : level === "namespace" ? 0.35 : 0.12;
 
-  const cpu = seedNumber(name + "cpu", 800, 3000) * multiplier;
-  const ram = seedNumber(name + "ram", 400, 1800) * multiplier;
-  const storage = seedNumber(name + "storage", 80, 400) * multiplier;
-  const network = seedNumber(name + "network", 100, 500) * multiplier;
-  const gpu = seedNumber(name + "gpu", 0, 1000) * multiplier;
-  const efficiency = seedNumber(name + "eff", 5, 75);
+  const cpu    = Math.round(seedNumber(seedKey + "||cpu",     500,  3000) * multiplier);
+  const ram    = Math.round(seedNumber(seedKey + "||ram",     300,  1800) * multiplier);
+  const storage= Math.round(seedNumber(seedKey + "||storage",  50,   400) * multiplier);
+  const network= Math.round(seedNumber(seedKey + "||network",  80,   500) * multiplier);
+  const gpu    = Math.round(seedNumber(seedKey + "||gpu",       0,  1000) * multiplier);
+
+  // Efficiency: realistic spread 5–75%, never exceeds 75
+  const efficiency = seedNumber(seedKey + "||eff", 5, 75);
   const total = cpu + ram + storage + network + gpu;
 
   return {
     id,
     name,
-    cpu: Math.round(cpu),
-    ram: Math.round(ram),
-    storage: Math.round(storage),
-    network: Math.round(network),
-    gpu: Math.round(gpu),
+    cpu,
+    ram,
+    storage,
+    network,
+    gpu,
     efficiency,
-    total: Math.round(total),
+    total,
   };
 };
 
-// Maps raw API titles into CostRows for a given drill level
 export const mapApiDataToCostRows = (
   titles: string[],
   level: DrillLevel,
@@ -54,20 +61,20 @@ export const mapApiDataToCostRows = (
       : "Pod";
 
   return titles.slice(0, 4).map((title, index) => {
-    const name = `${levelLabel} ${String.fromCharCode(65 + index)}`;
-    const id = `${parentName}-${name}-${index}`.replace(/\s+/g, "-");
-    return generateCostRow(id, name, level);
+    const displayName = `${levelLabel} ${String.fromCharCode(65 + index)}`;
+    // seedKey uses API title + parent + index — guaranteed unique per row
+    const seedKey = `${title}__${parentName}__${level}__${index}`;
+    const id = `${parentName}-${displayName}-${index}`.replace(/\s+/g, "-");
+    return generateCostRow(id, seedKey, displayName, level);
   });
 };
 
-// Returns the most wasteful row (lowest efficiency, highest cost)
 export const findMostWasteful = (rows: CostRow[]): CostRow => {
   return rows.reduce((worst, current) =>
     current.efficiency < worst.efficiency ? current : worst
   );
 };
 
-// Returns potential savings estimate
 export const calculateSavings = (row: CostRow): number => {
   const wasteRatio = (100 - row.efficiency) / 100;
   return Math.round(row.total * wasteRatio * 0.4);
